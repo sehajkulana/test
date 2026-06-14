@@ -132,19 +132,103 @@
         });
       };
 
+      const animateCounters = (section) => {
+        section.querySelectorAll("[data-count-value]").forEach((counter) => {
+          if (counter.dataset.counted === "true") return;
+
+          counter.dataset.counted = "true";
+          if (counter.countAnimationFrame) window.cancelAnimationFrame(counter.countAnimationFrame);
+
+          const target = Number(counter.dataset.countValue);
+          const suffix = counter.dataset.countSuffix || "";
+          const duration = 2200;
+          const start = performance.now();
+
+          const draw = (now) => {
+            const progress = Math.min((now - start) / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 2);
+            counter.textContent = `${Math.round(target * eased)}${suffix}`;
+
+            if (progress < 1) {
+              counter.countAnimationFrame = window.requestAnimationFrame(draw);
+            }
+          };
+
+          counter.textContent = `0${suffix}`;
+          counter.countAnimationFrame = window.requestAnimationFrame(draw);
+        });
+      };
+
+      const resetCounters = (section) => {
+        section.querySelectorAll("[data-count-value]").forEach((counter) => {
+          if (counter.countAnimationFrame) window.cancelAnimationFrame(counter.countAnimationFrame);
+
+          counter.dataset.counted = "false";
+          counter.textContent = `0${counter.dataset.countSuffix || ""}`;
+        });
+      };
+
+      const initTimelineCounters = () => {
+        const section = document.querySelector("#timeline");
+        if (!section) return;
+
+        resetCounters(section);
+
+        if (!("IntersectionObserver" in window)) {
+          animateCounters(section);
+          return;
+        }
+
+        if (section.timelineCounterObserver) section.timelineCounterObserver.disconnect();
+
+        section.timelineCounterObserver = new IntersectionObserver((entries, observer) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) {
+              resetCounters(section);
+              return;
+            }
+
+            animateCounters(section);
+          });
+        }, { threshold: 0.42 });
+
+        section.timelineCounterObserver.observe(section);
+      };
+
       document.addEventListener("DOMContentLoaded", initOrbitalTimeline);
+      document.addEventListener("DOMContentLoaded", initTimelineCounters);
       document.addEventListener("turbo:load", initOrbitalTimeline);
+      document.addEventListener("turbo:load", initTimelineCounters);
       document.addEventListener("turbo:before-cache", () => {
         document.querySelectorAll(".orbital-stage").forEach((stage) => {
           if (stage.orbitalTimelineCleanup) stage.orbitalTimelineCleanup();
+        });
+
+        document.querySelectorAll("#timeline").forEach((section) => {
+          if (section.timelineCounterObserver) section.timelineCounterObserver.disconnect();
         });
       });
     })();
   </script>
 <% end %>
 
+<nav class="page-nav" aria-label="Section navigation">
+  <a href="#scene" class="page-nav__brand">
+    <span aria-hidden="true"></span>
+    Store
+  </a>
+
+  <div class="page-nav__links">
+    <a href="#scene">3D Scene</a>
+    <a href="#timeline">Timeline</a>
+    <a href="#cards">Cards</a>
+    <a href="#features">Features</a>
+    <a href="#contact">Contact</a>
+  </div>
+</nav>
+
 <main class="spline-page">
-  <section class="spline-card" aria-labelledby="spline-scene-title">
+  <section id="scene" class="spline-card" aria-labelledby="spline-scene-title">
     <svg
       class="spline-spotlight"
       xmlns="http://www.w3.org/2000/svg"
@@ -195,7 +279,22 @@
     </div>
   </section>
 
-  <section class="orbital-section" aria-label="Radial orbital timeline">
+  <section id="timeline" class="orbital-section" aria-label="Radial orbital timeline">
+    <div class="orbital-copy">
+      <p class="orbital-copy__kicker">Project orbit</p>
+      <h2>See the whole build path at once</h2>
+      <p>
+        Follow each milestone from planning to release in a living timeline.
+        Select a node to pause the motion, inspect its status, and jump to the
+        connected phase.
+      </p>
+      <div class="orbital-copy__stats" aria-label="Timeline summary">
+        <span><strong data-count-value="5">0</strong> phases</span>
+        <span><strong data-count-value="3">0</strong> states</span>
+        <span><strong data-count-value="100" data-count-suffix="%">0%</strong> first milestone</span>
+      </div>
+    </div>
+
     <div
       class="orbital-stage"
     >
@@ -359,7 +458,62 @@
     </div>
   </section>
 
-  <section class="bento-section" aria-label="Bento feature grid">
+  <section id="cards" class="display-cards-section" aria-label="Featured updates">
+    <div class="display-cards-copy">
+      <p class="display-cards-kicker">Component showcase</p>
+      <h2>Layered cards for featured content</h2>
+      <p>
+        A native Rails version of the display-card stack from the provided file,
+        tuned to sit cleanly beside the existing Spline and orbital sections.
+      </p>
+    </div>
+
+    <div class="display-cards-stack" aria-label="Featured content cards">
+      <article class="display-card display-card--featured">
+        <div class="display-card__top">
+          <span class="display-card__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z" />
+              <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8Z" />
+            </svg>
+          </span>
+          <h3>Featured</h3>
+        </div>
+        <p>Discover amazing content</p>
+        <time>Just now</time>
+      </article>
+
+      <article class="display-card display-card--popular">
+        <div class="display-card__top">
+          <span class="display-card__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z" />
+              <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8Z" />
+            </svg>
+          </span>
+          <h3>Popular</h3>
+        </div>
+        <p>Trending this week</p>
+        <time>2 days ago</time>
+      </article>
+
+      <article class="display-card display-card--new">
+        <div class="display-card__top">
+          <span class="display-card__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z" />
+              <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8Z" />
+            </svg>
+          </span>
+          <h3>New</h3>
+        </div>
+        <p>Latest updates and features</p>
+        <time>Today</time>
+      </article>
+    </div>
+  </section>
+
+  <section id="features" class="bento-section" aria-label="Bento feature grid">
     <div class="bento-grid">
       <article class="bento-card bento-card--wide is-persistent">
         <div class="bento-card__pattern" aria-hidden="true"></div>
@@ -475,6 +629,48 @@
           </div>
         </div>
       </article>
+    </div>
+
+    <div id="contact" class="contact-panel" aria-labelledby="contact-panel-title">
+      <div class="contact-panel__copy">
+        <p class="contact-panel__kicker">Start a project</p>
+        <h2 id="contact-panel-title">Tell us what you want to build</h2>
+        <p>
+          Share a few details and we will help shape the next step for your
+          product, workflow, or interactive experience.
+        </p>
+      </div>
+
+      <form class="contact-form" action="#" method="post">
+        <div class="contact-form__row">
+          <label>
+            <span>Name</span>
+            <input type="text" name="name" autocomplete="name" placeholder="Your name">
+          </label>
+
+          <label>
+            <span>Email</span>
+            <input type="email" name="email" autocomplete="email" placeholder="you@example.com">
+          </label>
+        </div>
+
+        <label>
+          <span>Project type</span>
+          <select name="project_type">
+            <option value="">Choose one</option>
+            <option value="website">Website</option>
+            <option value="dashboard">Dashboard</option>
+            <option value="interactive">Interactive experience</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Message</span>
+          <textarea name="message" rows="5" placeholder="Briefly describe your idea"></textarea>
+        </label>
+
+        <button type="submit">Send request</button>
+      </form>
     </div>
   </section>
 </main>
