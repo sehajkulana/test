@@ -1,11 +1,56 @@
+<% content_for :head do %>
+  <script type="module" src="https://unpkg.com/@splinetool/viewer/build/spline-viewer.js"></script>
+<% end %>
 
-<h1>Products</h1>
-      <%= 6 %>
+<main class="spline-page">
+  <section class="spline-card" aria-labelledby="spline-scene-title">
+    <svg
+      class="spline-spotlight"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 3787 2842"
+      fill="none"
+      aria-hidden="true"
+    >
+      <g filter="url(#spline-spotlight-filter)">
+        <ellipse
+          cx="1924.71"
+          cy="273.501"
+          rx="1924.71"
+          ry="273.501"
+          transform="matrix(-0.822377 -0.568943 -0.568943 0.822377 3631.88 2291.09)"
+          fill="white"
+          fill-opacity="0.21"
+        />
+      </g>
+      <defs>
+        <filter
+          id="spline-spotlight-filter"
+          x="0.860352"
+          y="0.838989"
+          width="3785.16"
+          height="2840.26"
+          filterUnits="userSpaceOnUse"
+          color-interpolation-filters="sRGB"
+        >
+          <feFlood flood-opacity="0" result="BackgroundImageFix" />
+          <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+          <feGaussianBlur stdDeviation="151" result="effect1_foregroundBlur_1065_8" />
+        </filter>
+      </defs>
+    </svg>
 
-<div id="products">
-  <% @products.each do |product| %>
-    <div>
-      <%= link_to product.name, product_path(product.id) %>
+    <div class="spline-card__content">
+      <p class="spline-kicker">Spline scene</p>
+      <h1 id="spline-scene-title">Interactive 3D</h1>
+      <p>
+        Bring your UI to life with beautiful 3D scenes. Create immersive experiences
+        that capture attention and enhance your design.
+      </p>
     </div>
-  <% end %>
-</div>
+
+    <div class="spline-card__scene" aria-label="Interactive 3D Spline scene">
+      <div class="spline-loader" aria-hidden="true"></div>
+      <spline-viewer url="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"></spline-viewer>
+    </div>
+  </section>
+</main>
