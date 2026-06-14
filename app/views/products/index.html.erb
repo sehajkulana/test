@@ -1,5 +1,146 @@
 <% content_for :head do %>
   <script type="module" src="https://unpkg.com/@splinetool/viewer/build/spline-viewer.js"></script>
+  <script>
+    (() => {
+      const initOrbitalTimeline = () => {
+        document.querySelectorAll(".orbital-stage").forEach((stage) => {
+          if (stage.orbitalTimelineCleanup) stage.orbitalTimelineCleanup();
+
+          const orbit = stage.querySelector(".orbital-system");
+          const nodes = Array.from(stage.querySelectorAll(".orbital-node"));
+          let rotationAngle = 0;
+          let activeNodeId = null;
+          let autoRotate = true;
+          let timerId;
+          let centeringTimeout;
+
+          const relatedIdsFor = (node) => (
+            node.dataset.relatedIds || ""
+          ).split(",").filter(Boolean).map((id) => Number(id));
+
+          const getRadius = () => {
+            const width = stage.getBoundingClientRect().width;
+            return Math.max(118, Math.min(200, (width - 180) / 2));
+          };
+
+          const updatePositions = () => {
+            const radius = getRadius();
+
+            nodes.forEach((node, index) => {
+              const angle = ((index / nodes.length) * 360 + rotationAngle) % 360;
+              const radian = angle * Math.PI / 180;
+              const x = radius * Math.cos(radian);
+              const y = radius * Math.sin(radian);
+              const depth = (1 + Math.sin(radian)) / 2;
+
+              node.style.transform = `translate(${x}px, ${y}px)`;
+              node.style.zIndex = node.classList.contains("is-active") ? 200 : Math.round(100 + 50 * Math.cos(radian));
+              node.style.opacity = node.classList.contains("is-active") ? 1 : Math.max(0.42, 0.42 + 0.58 * depth);
+              node.style.setProperty("--orbital-energy-size", `${Number(node.dataset.energy) * 0.5 + 40}px`);
+            });
+          };
+
+          const updateState = () => {
+            const activeNode = nodes.find((node) => Number(node.dataset.nodeId) === activeNodeId);
+            const relatedIds = activeNode ? relatedIdsFor(activeNode) : [];
+
+            nodes.forEach((node) => {
+              const id = Number(node.dataset.nodeId);
+              node.classList.toggle("is-active", id === activeNodeId);
+              node.classList.toggle("is-related", relatedIds.includes(id));
+              node.classList.toggle("is-muted", activeNodeId !== null && id !== activeNodeId && !relatedIds.includes(id));
+            });
+          };
+
+          const centerOnNode = (id) => {
+            const index = nodes.findIndex((node) => Number(node.dataset.nodeId) === id);
+            if (index < 0) return;
+
+            rotationAngle = 270 - (index / nodes.length) * 360;
+          };
+
+          const activateNode = (id) => {
+            activeNodeId = Number(id);
+            autoRotate = false;
+            stage.classList.add("is-centering");
+            window.clearTimeout(centeringTimeout);
+            centerOnNode(activeNodeId);
+            updateState();
+            updatePositions();
+            centeringTimeout = window.setTimeout(() => {
+              stage.classList.remove("is-centering");
+            }, 720);
+          };
+
+          const clearActive = () => {
+            activeNodeId = null;
+            autoRotate = true;
+            stage.classList.remove("is-centering");
+            window.clearTimeout(centeringTimeout);
+            updateState();
+          };
+
+          const onStageClick = (event) => {
+            if (event.target === stage || event.target === orbit) clearActive();
+          };
+
+          const nodeHandlers = nodes.map((node) => {
+            const handler = (event) => {
+              event.stopPropagation();
+              if (event.target.closest(".orbital-card")) return;
+
+              const id = Number(node.dataset.nodeId);
+              if (activeNodeId === id) {
+                clearActive();
+              } else {
+                activateNode(id);
+              }
+            };
+
+            node.addEventListener("click", handler);
+            return [node, handler];
+          });
+
+          const linkHandlers = Array.from(stage.querySelectorAll(".orbital-link")).map((link) => {
+            const handler = (event) => {
+              event.stopPropagation();
+              activateNode(link.dataset.nodeIdParam);
+            };
+
+            link.addEventListener("click", handler);
+            return [link, handler];
+          });
+
+          const tick = () => {
+            if (autoRotate) {
+              rotationAngle = (rotationAngle + 0.3) % 360;
+              updatePositions();
+            }
+          };
+
+          stage.addEventListener("click", onStageClick);
+          updatePositions();
+          timerId = window.setInterval(tick, 50);
+
+          stage.orbitalTimelineCleanup = () => {
+            window.clearInterval(timerId);
+            window.clearTimeout(centeringTimeout);
+            stage.removeEventListener("click", onStageClick);
+            nodeHandlers.forEach(([node, handler]) => node.removeEventListener("click", handler));
+            linkHandlers.forEach(([link, handler]) => link.removeEventListener("click", handler));
+          };
+        });
+      };
+
+      document.addEventListener("DOMContentLoaded", initOrbitalTimeline);
+      document.addEventListener("turbo:load", initOrbitalTimeline);
+      document.addEventListener("turbo:before-cache", () => {
+        document.querySelectorAll(".orbital-stage").forEach((stage) => {
+          if (stage.orbitalTimelineCleanup) stage.orbitalTimelineCleanup();
+        });
+      });
+    })();
+  </script>
 <% end %>
 
 <main class="spline-page">
@@ -51,6 +192,289 @@
     <div class="spline-card__scene" aria-label="Interactive 3D Spline scene">
       <div class="spline-loader" aria-hidden="true"></div>
       <spline-viewer url="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"></spline-viewer>
+    </div>
+  </section>
+
+  <section class="orbital-section" aria-label="Radial orbital timeline">
+    <div
+      class="orbital-stage"
+    >
+      <div class="orbital-system">
+        <div class="orbital-core" aria-hidden="true">
+          <span></span>
+        </div>
+        <div class="orbital-ring" aria-hidden="true"></div>
+
+        <article
+          class="orbital-node"
+          data-node-id="1"
+          data-related-ids="2"
+          data-energy="100"
+          style="--orbit-angle: 0deg"
+        >
+          <button type="button" class="orbital-node__button" aria-label="Open Planning timeline item">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 2v3M17 2v3M4 9h16M6 5h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" />
+            </svg>
+          </button>
+          <span class="orbital-node__label">Planning</span>
+          <div class="orbital-card">
+            <div class="orbital-card__meta">
+              <span class="orbital-badge is-complete">Complete</span>
+              <time>Jan 2024</time>
+            </div>
+            <h3>Planning</h3>
+            <p>Project planning and requirements gathering phase.</p>
+            <div class="orbital-energy">
+              <span>Energy Level</span>
+              <strong>100%</strong>
+              <i style="--energy: 100%"></i>
+            </div>
+            <button type="button" class="orbital-link" data-node-id-param="2">Design</button>
+          </div>
+        </article>
+
+        <article
+          class="orbital-node"
+          data-node-id="2"
+          data-related-ids="1,3"
+          data-energy="90"
+          style="--orbit-angle: 72deg"
+        >
+          <button type="button" class="orbital-node__button" aria-label="Open Design timeline item">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7Z" />
+              <path d="M14 2v5h5M8 13h8M8 17h5" />
+            </svg>
+          </button>
+          <span class="orbital-node__label">Design</span>
+          <div class="orbital-card">
+            <div class="orbital-card__meta">
+              <span class="orbital-badge is-complete">Complete</span>
+              <time>Feb 2024</time>
+            </div>
+            <h3>Design</h3>
+            <p>UI/UX design and system architecture.</p>
+            <div class="orbital-energy">
+              <span>Energy Level</span>
+              <strong>90%</strong>
+              <i style="--energy: 90%"></i>
+            </div>
+            <button type="button" class="orbital-link" data-node-id-param="1">Planning</button>
+            <button type="button" class="orbital-link" data-node-id-param="3">Development</button>
+          </div>
+        </article>
+
+        <article
+          class="orbital-node"
+          data-node-id="3"
+          data-related-ids="2,4"
+          data-energy="60"
+          style="--orbit-angle: 144deg"
+        >
+          <button type="button" class="orbital-node__button" aria-label="Open Development timeline item">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" />
+            </svg>
+          </button>
+          <span class="orbital-node__label">Development</span>
+          <div class="orbital-card">
+            <div class="orbital-card__meta">
+              <span class="orbital-badge is-progress">In Progress</span>
+              <time>Mar 2024</time>
+            </div>
+            <h3>Development</h3>
+            <p>Core features implementation and testing.</p>
+            <div class="orbital-energy">
+              <span>Energy Level</span>
+              <strong>60%</strong>
+              <i style="--energy: 60%"></i>
+            </div>
+            <button type="button" class="orbital-link" data-node-id-param="2">Design</button>
+            <button type="button" class="orbital-link" data-node-id-param="4">Testing</button>
+          </div>
+        </article>
+
+        <article
+          class="orbital-node"
+          data-node-id="4"
+          data-related-ids="3,5"
+          data-energy="30"
+          style="--orbit-angle: 216deg"
+        >
+          <button type="button" class="orbital-node__button" aria-label="Open Testing timeline item">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </button>
+          <span class="orbital-node__label">Testing</span>
+          <div class="orbital-card">
+            <div class="orbital-card__meta">
+              <span class="orbital-badge is-pending">Pending</span>
+              <time>Apr 2024</time>
+            </div>
+            <h3>Testing</h3>
+            <p>User testing and bug fixes.</p>
+            <div class="orbital-energy">
+              <span>Energy Level</span>
+              <strong>30%</strong>
+              <i style="--energy: 30%"></i>
+            </div>
+            <button type="button" class="orbital-link" data-node-id-param="3">Development</button>
+            <button type="button" class="orbital-link" data-node-id-param="5">Release</button>
+          </div>
+        </article>
+
+        <article
+          class="orbital-node"
+          data-node-id="5"
+          data-related-ids="4"
+          data-energy="10"
+          style="--orbit-angle: 288deg"
+        >
+          <button type="button" class="orbital-node__button" aria-label="Open Release timeline item">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 6v6l4 2" />
+            </svg>
+          </button>
+          <span class="orbital-node__label">Release</span>
+          <div class="orbital-card">
+            <div class="orbital-card__meta">
+              <span class="orbital-badge is-pending">Pending</span>
+              <time>May 2024</time>
+            </div>
+            <h3>Release</h3>
+            <p>Final deployment and release.</p>
+            <div class="orbital-energy">
+              <span>Energy Level</span>
+              <strong>10%</strong>
+              <i style="--energy: 10%"></i>
+            </div>
+            <button type="button" class="orbital-link" data-node-id-param="4">Testing</button>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="bento-section" aria-label="Bento feature grid">
+    <div class="bento-grid">
+      <article class="bento-card bento-card--wide is-persistent">
+        <div class="bento-card__pattern" aria-hidden="true"></div>
+        <div class="bento-card__body">
+          <div class="bento-card__top">
+            <div class="bento-icon bento-icon--blue" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="m3 17 6-6 4 4 8-8" />
+                <path d="M14 7h7v7" />
+              </svg>
+            </div>
+            <span class="bento-status">Live</span>
+          </div>
+
+          <div class="bento-card__copy">
+            <h2>Analytics Dashboard <span>v2.4.1</span></h2>
+            <p>Real-time metrics with AI-powered insights and predictive analytics</p>
+          </div>
+
+          <div class="bento-card__footer">
+            <div class="bento-tags">
+              <span>#Statistics</span>
+              <span>#Reports</span>
+              <span>#AI</span>
+            </div>
+            <a href="#" class="bento-cta">Explore &rarr;</a>
+          </div>
+        </div>
+      </article>
+
+      <article class="bento-card">
+        <div class="bento-card__pattern" aria-hidden="true"></div>
+        <div class="bento-card__body">
+          <div class="bento-card__top">
+            <div class="bento-icon bento-icon--emerald" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M9 12l2 2 4-4" />
+                <circle cx="12" cy="12" r="9" />
+              </svg>
+            </div>
+            <span class="bento-status">Updated</span>
+          </div>
+
+          <div class="bento-card__copy">
+            <h2>Task Manager <span>84 completed</span></h2>
+            <p>Automated workflow management with priority scheduling</p>
+          </div>
+
+          <div class="bento-card__footer">
+            <div class="bento-tags">
+              <span>#Productivity</span>
+              <span>#Automation</span>
+            </div>
+            <a href="#" class="bento-cta">Explore &rarr;</a>
+          </div>
+        </div>
+      </article>
+
+      <article class="bento-card bento-card--wide">
+        <div class="bento-card__pattern" aria-hidden="true"></div>
+        <div class="bento-card__body">
+          <div class="bento-card__top">
+            <div class="bento-icon bento-icon--purple" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="m15 10 5-3v10l-5-3Z" />
+                <rect x="3" y="6" width="12" height="12" rx="2" />
+              </svg>
+            </div>
+            <span class="bento-status">Active</span>
+          </div>
+
+          <div class="bento-card__copy">
+            <h2>Media Library <span>12GB used</span></h2>
+            <p>Cloud storage with intelligent content processing</p>
+          </div>
+
+          <div class="bento-card__footer">
+            <div class="bento-tags">
+              <span>#Storage</span>
+              <span>#CDN</span>
+            </div>
+            <a href="#" class="bento-cta">Explore &rarr;</a>
+          </div>
+        </div>
+      </article>
+
+      <article class="bento-card">
+        <div class="bento-card__pattern" aria-hidden="true"></div>
+        <div class="bento-card__body">
+          <div class="bento-card__top">
+            <div class="bento-icon bento-icon--sky" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M3 12h18" />
+                <path d="M12 3a14 14 0 0 1 0 18" />
+                <path d="M12 3a14 14 0 0 0 0 18" />
+              </svg>
+            </div>
+            <span class="bento-status">Beta</span>
+          </div>
+
+          <div class="bento-card__copy">
+            <h2>Global Network <span>6 regions</span></h2>
+            <p>Multi-region deployment with edge computing</p>
+          </div>
+
+          <div class="bento-card__footer">
+            <div class="bento-tags">
+              <span>#Infrastructure</span>
+              <span>#Edge</span>
+            </div>
+            <a href="#" class="bento-cta">Explore &rarr;</a>
+          </div>
+        </div>
+      </article>
     </div>
   </section>
 </main>
